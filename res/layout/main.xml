@@ -11,26 +11,31 @@
         android:gravity="center"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:text="Geoloqi Android SDK"
+        android:text="Geoloqi Battery Test Client"
         android:background="#444444" />
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
         android:padding="20dp">
+
         <TextView
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:textSize="16sp"
             android:textStyle="bold"
             android:text="Tracker Profile" />
-        <TextView
-            android:id="@+id/tracker_profile"
+
+        <Spinner
+            android:id="@+id/profile_spinner"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
+            android:layout_gravity="center"
             android:layout_marginLeft="20dp"
-            android:text="@null" />
+            android:layout_marginRight="20dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="10dp" />
+
         <TextView
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
@@ -141,5 +146,16 @@
                 android:layout_height="wrap_content"
                 android:text="0.0" />
         </LinearLayout>
+
+        <!-- Start / Stop button -->
+        <Button
+            android:id="@+id/start_stop_button"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginLeft="20dp"
+            android:layout_marginRight="20dp"
+            android:layout_marginTop="25dp"
+            android:text="Start Test" />
     </LinearLayout>
 </LinearLayout>

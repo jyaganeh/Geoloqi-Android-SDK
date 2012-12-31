@@ -9,11 +9,12 @@ import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.widget.TextView;
-
+import android.view.View;
+import android.widget.*;
 import com.geoloqi.android.sample.R;
 import com.geoloqi.android.sample.receiver.SampleReceiver;
 import com.geoloqi.android.sdk.LQTracker;
@@ -32,17 +33,37 @@ import com.geoloqi.android.sdk.service.LQService.LQBinder;
  * @author Tristan Waddington
  */
 public class LauncherActivity extends Activity implements SampleReceiver.OnLocationChangedListener,
-        SampleReceiver.OnTrackerProfileChangedListener, SampleReceiver.OnLocationUploadedListener {
+        SampleReceiver.OnTrackerProfileChangedListener, SampleReceiver.OnLocationUploadedListener,
+        AdapterView.OnItemSelectedListener {
     public static final String TAG = "LauncherActivity";
 
     private LQService mService;
     private boolean mBound;
     private SampleReceiver mLocationReceiver = new SampleReceiver();
 
+    private boolean mTestInProgress = false;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
+
+        // Set up profile spinner
+        Spinner spinner = (Spinner) findViewById(R.id.profile_spinner);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.tracker_profile_entries, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setOnItemSelectedListener(this);
+
+        // Set up start/stop button
+        Button button = (Button) findViewById(R.id.start_stop_button);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                toggleTest();
+            }
+        });
         
         // Start the tracking service
         Intent intent = new Intent(this, LQService.class);
@@ -92,6 +113,32 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+        LQTrackerProfile profile = LQTrackerProfile.values()[i];
+        Log.d(getString(R.string.app_name),
+                "Profile selected: '" + profile.name() + "'" );
+        mService.getTracker().setProfile(profile);
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> adapterView) {
+        // Pass
+    }
+
+    public void toggleTest() {
+        if (!mTestInProgress) {
+            // Start
+
+        } else {
+            // Stop
+
+        }
+        mTestInProgress = !mTestInProgress;
+        Button button = (Button) findViewById(R.id.start_stop_button);
+        button.setText(mTestInProgress ? "Stop Test" : "Start Test");
     }
 
     /**
@@ -153,9 +200,9 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
                 mBound = true;
                 
                 // Display the current tracker profile
-                TextView profileView = (TextView) findViewById(R.id.tracker_profile);
-                if (profileView != null) {
-                    profileView.setText(mService.getTracker().getProfile().toString());
+                Spinner spinner = (Spinner) findViewById(R.id.profile_spinner);
+                if (spinner != null) {
+                    spinner.setSelection(mService.getTracker().getProfile().ordinal());
                 }
             } catch (ClassCastException e) {
                 // Pass
@@ -171,9 +218,10 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     @Override
     public void onTrackerProfileChanged(LQTrackerProfile oldProfile,
                     LQTrackerProfile newProfile) {
-        TextView profileView = (TextView) findViewById(R.id.tracker_profile);
-        if (profileView != null) {
-            profileView.setText(newProfile.toString());
+        // Display the current tracker profile
+        Spinner spinner = (Spinner) findViewById(R.id.profile_spinner);
+        if (spinner != null) {
+            spinner.setSelection(newProfile.ordinal());
         }
     }
 
