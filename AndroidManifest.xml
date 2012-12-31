@@ -63,6 +63,12 @@
         <service
             android:name="com.geoloqi.android.sdk.service.LQService"
             android:exported="false" />
+
+        <!-- Volta (battery testing) services and receivers -->
+        <service
+            android:name="com.geoloqi.android.volta.VoltaService"
+            android:exported="false" />
+
         <!-- NOTE: This receiver is required if you wish to enable GCM support in the Geoloqi SDK. -->
         <receiver
             android:name="com.geoloqi.android.sdk.receiver.LQDeviceMessagingReceiver"

@@ -23,6 +23,8 @@ import com.geoloqi.android.sdk.provider.LQDatabaseHelper;
 import com.geoloqi.android.sdk.receiver.LQBroadcastReceiver;
 import com.geoloqi.android.sdk.service.LQService;
 import com.geoloqi.android.sdk.service.LQService.LQBinder;
+import com.geoloqi.android.volta.VoltaService;
+import com.geoloqi.android.volta.VoltaService.VoltaBinder;
 
 /**
  * <p>This is the main {@link Activity} for the Geoloqi Sample Android
@@ -37,9 +39,12 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         AdapterView.OnItemSelectedListener {
     public static final String TAG = "LauncherActivity";
 
-    private LQService mService;
-    private boolean mBound;
+    private LQService mLqService;
+    private boolean mLqServiceBound;
     private SampleReceiver mLocationReceiver = new SampleReceiver();
+
+    private VoltaService mVoltaService;
+    private boolean mVoltaServiceBound;
 
     private boolean mTestInProgress = false;
 
@@ -66,8 +71,12 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         });
         
         // Start the tracking service
-        Intent intent = new Intent(this, LQService.class);
-        startService(intent);
+        Intent lqIntent = new Intent(this, LQService.class);
+        startService(lqIntent);
+
+        // Start the Volta service
+        Intent vIntent = new Intent(this, VoltaService.class);
+        startService(vIntent);
     }
 
     @Override
@@ -75,9 +84,13 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         super.onResume();
         
         // Bind to the tracking service so we can call public methods on it
-        Intent intent = new Intent(this, LQService.class);
-        bindService(intent, mConnection, 0);
-        
+        Intent lqIntent = new Intent(this, LQService.class);
+        bindService(lqIntent, mLQServiceConnection, 0);
+
+        // Bind to the tracking service so we can call public methods on it
+        Intent vIntent = new Intent(this, VoltaService.class);
+        bindService(vIntent, mVoltaServiceConnection, 0);
+
         // Wire up the sample location receiver
         registerReceiver(mLocationReceiver,
                 LQBroadcastReceiver.getDefaultIntentFilter());
@@ -88,9 +101,15 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         super.onPause();
         
         // Unbind from LQService
-        if (mBound) {
-            unbindService(mConnection);
-            mBound = false;
+        if (mLqServiceBound) {
+            unbindService(mLQServiceConnection);
+            mLqServiceBound = false;
+        }
+
+        // Unbind from VoltaService
+        if (mVoltaServiceBound) {
+            unbindService(mVoltaServiceConnection);
+            mVoltaServiceBound = false;
         }
         
         // Unregister our location receiver
@@ -120,7 +139,7 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         LQTrackerProfile profile = LQTrackerProfile.values()[i];
         Log.d(getString(R.string.app_name),
                 "Profile selected: '" + profile.name() + "'" );
-        mService.getTracker().setProfile(profile);
+        mLqService.getTracker().setProfile(profile);
     }
 
     @Override
@@ -129,25 +148,28 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     }
 
     public void toggleTest() {
-        if (!mTestInProgress) {
-            // Start
-
+        if (mVoltaServiceBound) {
+            if (!mTestInProgress) {
+                // Start
+                mVoltaService.startTest();
+            } else {
+                // Stop
+                mVoltaService.stopTest();
+            }
+            mTestInProgress = !mTestInProgress;
+            Button button = (Button) findViewById(R.id.start_stop_button);
+            button.setText(mTestInProgress ? "Stop Test" : "Start Test");
         } else {
-            // Stop
-
+           Toast.makeText(this, "VoltaService not bound!", Toast.LENGTH_LONG).show();
         }
-        mTestInProgress = !mTestInProgress;
-        Button button = (Button) findViewById(R.id.start_stop_button);
-        button.setText(mTestInProgress ? "Stop Test" : "Start Test");
     }
-
     /**
      * Display the number of batched location fixes waiting to be sent.
      */
     private void showBatchedLocationCount() {
         TextView updates = (TextView) findViewById(R.id.batched_updates);
         if (updates != null) {
-            final LQTracker tracker = mService.getTracker();
+            final LQTracker tracker = mLqService.getTracker();
             final LQDatabaseHelper helper = new LQDatabaseHelper(this);
             final SQLiteDatabase db = helper.getWritableDatabase();
             final Cursor c = tracker.getBatchedLocationFixes(db);
@@ -189,20 +211,19 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         }
     }
 
-    /** Defines callbacks for service binding, passed to bindService() */
-    private ServiceConnection mConnection = new ServiceConnection() {
+    /** Defines callbacks for LQService binding, passed to bindService() */
+    private ServiceConnection mLQServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             try {
-                // We've bound to LocalService, cast the IBinder and get LocalService instance.
                 LQBinder binder = (LQBinder) service;
-                mService = binder.getService();
-                mBound = true;
-                
+                mLqService = binder.getService();
+                mLqServiceBound = true;
+
                 // Display the current tracker profile
                 Spinner spinner = (Spinner) findViewById(R.id.profile_spinner);
                 if (spinner != null) {
-                    spinner.setSelection(mService.getTracker().getProfile().ordinal());
+                    spinner.setSelection(mLqService.getTracker().getProfile().ordinal());
                 }
             } catch (ClassCastException e) {
                 // Pass
@@ -211,7 +232,27 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            mBound = false;
+            mLqServiceBound = false;
+        }
+    };
+
+    /** Defines callbacks for VoltaService binding, passed to bindService() */
+    private ServiceConnection mVoltaServiceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            try {
+                // We've bound to LocalService, cast the IBinder and get LocalService instance.
+                VoltaBinder binder = (VoltaBinder) service;
+                mVoltaService = binder.getService();
+                mVoltaServiceBound = true;
+            } catch (ClassCastException e) {
+                // Pass
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mVoltaServiceBound = false;
         }
     };
 
