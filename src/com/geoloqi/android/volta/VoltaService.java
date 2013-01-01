@@ -18,19 +18,26 @@ import android.widget.Toast;
 // TODO: export this in the manifest if you run into trouble with receiving intents from the system service
 // TODO: stop listeners and receivers in onPause
 
+/**
+ * A service for monitoring system state during Geoloqi test runs.
+ *
+ * Periodic data is gathered every minute, triggered by  {@link Intent ACTION_TIME_TICK}.
+ * Event based data is gathered when screen state and cellular reception changes.
+ *
+ * @author Josh Yaganeh
+ */
 public class VoltaService extends Service {
 
     public static final String TAG = "VoltaService";
 
     private static final String DATA_POINT_SCREEN_STATE = "screen";
     private static final String DATA_POINT_WIFI_STATE = "wifi";
+
     private static final String DATA_POINT_BATTERY_LEVEL = "battery_level";
     private static final String DATA_POINT_BATTERY_SCALE = "battery_scale";
     private static final String DATA_POINT_BATTERY_PERCENT = "battery_percent";
     private static final String DATA_POINT_BATTERY_VOLTAGE = "battery_voltage";
-    private static final String DATA_POINT_LOCATION_UPDATE = "location";
-    private static final String DATA_POINT_LOCATION_PROVIDER = "provider";
-    private static final String DATA_POINT_TRACKING_PROFILE = "profile";
+
     private static final String DATA_POINT_GSM_SIGNAL_STRENGTH = "cell_signal_gsm";
     private static final String DATA_POINT_CDMA_SIGNAL_STRENGTH = "cell_signal_cdma";
     private static final String DATA_POINT_EVDO_SIGNAL_STRENGTH = "cell_signal_evdo";
@@ -42,12 +49,10 @@ public class VoltaService extends Service {
     private TelephonyManager mTelephonyManager;
     private VoltaPhoneStateListener mPhoneStateListener;
 
-
     private boolean mTestInProgress = false;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "Received start id " + startId + ": " + intent);
         return START_STICKY;
     }
 
@@ -65,8 +70,8 @@ public class VoltaService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        Toast.makeText(this, "VoltaService started.", Toast.LENGTH_SHORT).show();
 
+        // Register for intents
         IntentFilter filter = new IntentFilter(Intent.ACTION_TIME_TICK);
         filter.addAction(Intent.ACTION_SCREEN_ON);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
@@ -74,17 +79,28 @@ public class VoltaService extends Service {
         mReceiver = new VoltaBroadcastReceiver();
         registerReceiver(mReceiver, filter);
 
+        // Set up phone state listener to receive signal strength updates
         mPhoneStateListener = new VoltaPhoneStateListener();
         mTelephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+
+        Toast.makeText(this, "VoltaService started.", Toast.LENGTH_SHORT).show();
     }
 
+    /**
+     * Called when starting a test, this method posts an initial set of data to the Volta server and
+     * begins logging.
+     */
     public void startTest() {
         mTestInProgress = true;
         checkBatteryState();
         Toast.makeText(this, "Test started.", Toast.LENGTH_SHORT).show();
     }
 
+    /**
+     * Called when stopping a test, this method stops logging and posts a final set of data to the
+     * Volta server.
+     */
     public void stopTest() {
         mTestInProgress = false;
         checkBatteryState();
@@ -92,29 +108,26 @@ public class VoltaService extends Service {
     }
 
     /**
-     * Called when ACTION_TIME_TICK intent is received (happens every minute)
+     * Records a data point with the given type and value.
+     *
+     * TODO: make this actually post to the server.
+     *
+     * @param type
+     * @param value
      */
-    private void checkPeriodicData() {
-        checkBatteryState();
-    }
-
     public void recordDataPoint(String type, int value) {
         // TODO: use dedicated timer. this changes when the system time changes.
         Long timestamp = System.currentTimeMillis();
         Log.d(TAG, "DATAPOINT: " + type + ", " + value + ", " + timestamp);
     }
 
+    /**
+     * Checks and records the current state of the battery.
+     */
     private void checkBatteryState() {
-        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = registerReceiver(null, ifilter);
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(null, filter);
 
-        int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-        /*
-        boolean isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                             status == BatteryManager.BATTERY_STATUS_FULL);
-
-        int powerSource = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
-        */
         int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
         int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
         int percent = (int)(level / (float) scale) * 100;
@@ -132,7 +145,7 @@ public class VoltaService extends Service {
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(Intent.ACTION_TIME_TICK)) {
                 // Fired by the Android OS every minute
-                checkPeriodicData();
+                checkBatteryState();
             } else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
                 recordDataPoint(DATA_POINT_SCREEN_STATE, 1);
             } else if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
@@ -148,6 +161,8 @@ public class VoltaService extends Service {
                 recordDataPoint(DATA_POINT_GSM_SIGNAL_STRENGTH,
                         signalStrength.getGsmSignalStrength());
             } else {
+                // Data and Voice can be on either CDMA or EVDO depending on carrier.
+                // We don't know which is which, so log both!
                 recordDataPoint(DATA_POINT_CDMA_SIGNAL_STRENGTH,
                         signalStrength.getCdmaDbm());
                 recordDataPoint(DATA_POINT_EVDO_SIGNAL_STRENGTH,
