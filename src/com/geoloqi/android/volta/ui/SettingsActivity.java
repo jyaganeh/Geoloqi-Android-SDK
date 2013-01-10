@@ -1,4 +1,4 @@
-package com.geoloqi.android.sample.ui;
+package com.geoloqi.android.volta.ui;
 
 import android.content.ComponentName;
 import android.content.Intent;
@@ -14,7 +14,7 @@ import android.preference.PreferenceActivity;
 import android.preference.PreferenceManager;
 import android.widget.Toast;
 
-import com.geoloqi.android.sample.R;
+import com.geoloqi.android.volta.R;
 import com.geoloqi.android.sdk.LQBuild;
 import com.geoloqi.android.sdk.LQSession;
 import com.geoloqi.android.sdk.LQSharedPreferences;

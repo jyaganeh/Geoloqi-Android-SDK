@@ -1,4 +1,4 @@
-package com.geoloqi.android.sample.receiver;
+package com.geoloqi.android.volta.receiver;
 
 import android.content.Context;
 import android.location.Location;

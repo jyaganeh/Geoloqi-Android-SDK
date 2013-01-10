@@ -1,10 +1,7 @@
 package com.geoloqi.android.volta;
 
 import android.app.Service;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
+import android.content.*;
 import android.location.GpsStatus;
 import android.location.LocationManager;
 import android.net.wifi.WifiManager;
@@ -12,12 +9,16 @@ import android.os.BatteryManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
+import android.preference.PreferenceManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.widget.Toast;
 import com.geoloqi.android.sdk.LQSharedPreferences;
+import com.geoloqi.android.sdk.LQTracker;
+import com.geoloqi.android.sdk.service.LQService;
+import com.geoloqi.android.volta.util.DeviceUuidFactory;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -46,14 +47,15 @@ public class VoltaService extends Service {
     private static final String DATA_POINT_WIFI_STATE = "wifi_state";
     private static final String DATA_POINT_GPS_STATE = "gps_state";
 
-    private static final String DATA_POINT_BATTERY_LEVEL = "battery_level";
-    private static final String DATA_POINT_BATTERY_SCALE = "battery_scale";
     private static final String DATA_POINT_BATTERY_PERCENT = "battery_percent";
     private static final String DATA_POINT_BATTERY_VOLTAGE = "battery_voltage";
 
     private static final String DATA_POINT_GSM_SIGNAL_STRENGTH = "cell_signal_gsm";
     private static final String DATA_POINT_CDMA_SIGNAL_STRENGTH = "cell_signal_cdma";
     private static final String DATA_POINT_EVDO_SIGNAL_STRENGTH = "cell_signal_evdo";
+
+    private static final String PREF_PREFIX = "com.geoloqi.volta.preference";
+    private static final String PREF_IS_DEVICE_REGISTERED = PREF_PREFIX + "IS_DEVICE_REGISTERED";
 
     private final IBinder mBinder = new VoltaBinder();
 
@@ -69,8 +71,11 @@ public class VoltaService extends Service {
 
     private JSONArray mDataQueue;
     private JSONObject mTest;
-    private JSONObject mHardwareInfo;
-    private String mTestUuid;
+
+    private int mTestId;
+    private UUID mDeviceUuid;
+
+    private SharedPreferences mPreferences;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -92,6 +97,9 @@ public class VoltaService extends Service {
     public void onCreate() {
         super.onCreate();
 
+        // Get the unique id from the device
+        mDeviceUuid = new DeviceUuidFactory(this).getDeviceUuid();
+
         // Instantiate receivers, listeners, and managers for the various services we'll monitor.
         mReceiver = new VoltaBroadcastReceiver();
 
@@ -103,17 +111,44 @@ public class VoltaService extends Service {
 
         mWifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
-        Toast.makeText(this, "VoltaService running!", Toast.LENGTH_SHORT).show();
+        mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean registered = mPreferences.getBoolean(PREF_IS_DEVICE_REGISTERED, false);
+        if (!registered) {
+            // post device info to server
+            boolean success = VoltaHttpClient.postDeviceInfo(getDeviceInfo());
+            // remember that we've done this so that it doesn't happen again
+            mPreferences.edit().putBoolean(PREF_IS_DEVICE_REGISTERED, success).commit();
+        }
     }
 
     /**
      * Called when starting a test, this method posts an initial set of data to the Volta server and
      * begins logging.
      */
-    public void startTest() {
-        createTest();
+    public void startTest(int testId, int profileId) {
+        mTestId = testId;
 
-        checkPeriodic();
+        // Reset mTest, mHardwareInfo, and mDataQueue
+        mTest = new JSONObject();
+        mDataQueue = new JSONArray();
+
+        LQTracker.LQTrackerProfile profile = LQTracker.LQTrackerProfile.values()[profileId];
+
+        Intent setProfileIntent = new Intent(this, LQService.class);
+        setProfileIntent.setAction(LQService.ACTION_SET_TRACKER_PROFILE);
+        setProfileIntent.putExtra(LQService.EXTRA_PROFILE, profile);
+
+        startService(setProfileIntent);
+
+        try {
+            mTest.put("device_uuid", mDeviceUuid.toString());
+            mTest.put("test_id", mTestId);
+        } catch (JSONException e) {
+            Log.e(TAG, "Could not create test", e);
+        }
+
+        // Get initial periodic data
+        recordPeriodicDataPoints();
 
         // Register for system intents
         IntentFilter filter = new IntentFilter(Intent.ACTION_TIME_TICK);
@@ -127,15 +162,19 @@ public class VoltaService extends Service {
         // Attach gps status listener
         mLocationManager.addGpsStatusListener(mGpsStateListener);
 
+        Log.d(TAG, "The current geoloqi user is: " + LQSharedPreferences.getSessionUsername(this) +
+                    " (" + LQSharedPreferences.getSessionUserId(this) + ")");
+
         Toast.makeText(this, "Test started.", Toast.LENGTH_SHORT).show();
     }
 
     /**
      * Called when stopping a test, this method stops logging and posts a final set of data to the
-     * Volta server.
+     * Volta server.:
      */
     public void stopTest() {
-        checkPeriodic();
+        // Get final periodic data
+        recordPeriodicDataPoints();
 
         // Unregister for system intents
         unregisterReceiver(mReceiver);
@@ -147,48 +186,13 @@ public class VoltaService extends Service {
         mLocationManager.removeGpsStatusListener(mGpsStateListener);
 
         try {
-            mTest.put("hardware_info", mHardwareInfo);
             mTest.put("data", mDataQueue);
-            VoltaHttpClient.uploadDataPoints(mTest);
+            VoltaHttpClient.postDataPoints(mTest);
         } catch (Exception e) {
-            Log.e(TAG, "Error adding hardware info and data points.", e);
+            Log.e(TAG, "Error adding data points to test object.", e);
         }
 
         Toast.makeText(this, "Test stopped.", Toast.LENGTH_SHORT).show();
-    }
-
-    private void createTest() {
-        // Reset mTest, mHardwareInfo, and mDataQueue
-        mTest = new JSONObject();
-        mHardwareInfo = new JSONObject();
-        mDataQueue = new JSONArray();
-
-        // Generate a test UUID
-        mTestUuid = UUID.randomUUID().toString();
-
-        // Populate Hardware Info
-        try {
-            mHardwareInfo.put("sdk_version", Build.VERSION.SDK_INT);
-            mHardwareInfo.put("model", Build.MODEL);
-            mHardwareInfo.put("product", Build.PRODUCT);
-        } catch (JSONException e) {
-            Log.e(TAG, "Could not get hardware info", e);
-        }
-
-        // Populate Test info
-        String deviceUuid = LQSharedPreferences.getDeviceUuid(this);
-        String time = String.valueOf(System.currentTimeMillis() / 1000);
-
-        try {
-            mTest.put("test_uuid", mTestUuid);
-            mTest.put("device_uuid", deviceUuid);
-            mTest.put("mobile_platform", "android");
-            mTest.put("carrier", mTelephonyManager.getNetworkOperatorName());
-            mTest.put("timestamp", time);
-
-        } catch (JSONException e) {
-            Log.e(TAG, "Could not create test", e);
-        }
     }
 
     /**
@@ -200,6 +204,32 @@ public class VoltaService extends Service {
      * @param value
      */
     public void recordDataPoint(String type, int value) {
+        // TODO: use a dedicated timer. this changes when the system time changes.
+        Long timestamp = System.currentTimeMillis() / 1000;
+        JSONObject dataPoint = new JSONObject();
+
+        try {
+            dataPoint.put("timestamp", timestamp);
+            dataPoint.put("type", type);
+            dataPoint.put("value", value);
+        } catch (JSONException e) {
+            Log.e(TAG, "error building datapoint", e);
+        }
+
+        mDataQueue.put(dataPoint);
+
+        Log.d(TAG, "DATAPOINT: " + type + ", " + value + ", " + timestamp);
+    }
+
+    /**
+     * Records a data point with the given type and value.
+     *
+     * TODO: make this actually post to the server.
+     *
+     * @param type
+     * @param value
+     */
+    public void recordDataPoint(String type, float value) {
         // TODO: use dedicated timer. this changes when the system time changes.
         Long timestamp = System.currentTimeMillis();
         JSONObject dataPoint = new JSONObject();
@@ -217,26 +247,24 @@ public class VoltaService extends Service {
         Log.d(TAG, "DATAPOINT: " + type + ", " + value + ", " + timestamp);
     }
 
-    public void checkPeriodic() {
-        checkBatteryState();
-        checkWifiState();
+    public void recordPeriodicDataPoints() {
+        recordBatteryState();
+        recordWifiState();
     }
 
     /**
      * Checks and records the current state of the battery.
      */
-    private void checkBatteryState() {
+    private void recordBatteryState() {
         IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         Intent batteryStatus = registerReceiver(null, filter);
 
         int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
         int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-        int percent = (int)(level / (float) scale) * 100;
+        float percent = (level / (float) scale);
 
         int voltage = batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1);
 
-        recordDataPoint(DATA_POINT_BATTERY_LEVEL, level);
-        recordDataPoint(DATA_POINT_BATTERY_SCALE, scale);
         recordDataPoint(DATA_POINT_BATTERY_PERCENT, percent);
         recordDataPoint(DATA_POINT_BATTERY_VOLTAGE, voltage);
     }
@@ -244,9 +272,32 @@ public class VoltaService extends Service {
     /**
      * Checks and records the current state of the WiFi radio.
      */
-    private void checkWifiState() {
+    private void recordWifiState() {
         int wifi = mWifiManager.isWifiEnabled() ? 1 : 0;
         recordDataPoint(DATA_POINT_WIFI_STATE, wifi);
+    }
+
+    private JSONObject getDeviceInfo() {
+        JSONObject deviceInfo = new JSONObject();
+        JSONObject extra = new JSONObject();
+
+        // Populate Hardware Info
+        try {
+            deviceInfo.put("uuid", mDeviceUuid.toString());
+            deviceInfo.put("mobile_platform", "android");
+            deviceInfo.put("carrier",  mTelephonyManager.getNetworkOperatorName());
+            deviceInfo.put("hardware_model", Build.MANUFACTURER + " " + Build.MODEL);
+
+            extra.put("build", Build.DISPLAY);
+            extra.put("version", Build.VERSION.RELEASE);
+            extra.put("api_level", Build.VERSION.SDK_INT);
+
+            deviceInfo.put("extra", extra);
+        } catch (JSONException e) {
+            Log.e(TAG, "Could not get hardware info", e);
+        }
+
+        return deviceInfo;
     }
 
     private class VoltaBroadcastReceiver extends BroadcastReceiver {
@@ -254,7 +305,7 @@ public class VoltaService extends Service {
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(Intent.ACTION_TIME_TICK)) {
                 // Fired by the Android OS every minute
-                checkPeriodic();
+                recordPeriodicDataPoints();
             } else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
                 recordDataPoint(DATA_POINT_SCREEN_STATE, 1);
             } else if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
@@ -266,17 +317,12 @@ public class VoltaService extends Service {
     private class VoltaPhoneStateListener extends PhoneStateListener {
         @Override
         public void onSignalStrengthsChanged(SignalStrength signalStrength) {
-            if (signalStrength.isGsm()) {
-                recordDataPoint(DATA_POINT_GSM_SIGNAL_STRENGTH,
-                        signalStrength.getGsmSignalStrength());
-            } else {
-                // Data and Voice can be on either CDMA or EVDO depending on carrier.
-                // We don't know which is which, so log both!
-                recordDataPoint(DATA_POINT_CDMA_SIGNAL_STRENGTH,
-                        signalStrength.getCdmaDbm());
-                recordDataPoint(DATA_POINT_EVDO_SIGNAL_STRENGTH,
-                        signalStrength.getEvdoDbm());
-            }
+            recordDataPoint(DATA_POINT_GSM_SIGNAL_STRENGTH,
+                    signalStrength.getGsmSignalStrength());
+            recordDataPoint(DATA_POINT_CDMA_SIGNAL_STRENGTH,
+                    signalStrength.getCdmaDbm());
+            recordDataPoint(DATA_POINT_EVDO_SIGNAL_STRENGTH,
+                    signalStrength.getEvdoDbm());
         }
 
     }

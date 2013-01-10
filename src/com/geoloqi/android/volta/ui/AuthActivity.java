@@ -1,4 +1,4 @@
-package com.geoloqi.android.sample.ui;
+package com.geoloqi.android.volta.ui;
 
 import org.apache.http.Header;
 import org.apache.http.StatusLine;
@@ -17,7 +17,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import com.geoloqi.android.sample.R;
+import com.geoloqi.android.volta.R;
 import com.geoloqi.android.sdk.LQException;
 import com.geoloqi.android.sdk.LQSession;
 import com.geoloqi.android.sdk.LQSession.OnRunApiRequestListener;

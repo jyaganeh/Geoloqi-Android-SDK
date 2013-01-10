@@ -1,4 +1,4 @@
-package com.geoloqi.android.sample.ui;
+package com.geoloqi.android.volta.ui;
 
 import android.app.Activity;
 import android.content.ComponentName;
@@ -15,8 +15,9 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.*;
-import com.geoloqi.android.sample.R;
-import com.geoloqi.android.sample.receiver.SampleReceiver;
+import com.geoloqi.android.volta.R;
+import com.geoloqi.android.volta.receiver.SampleReceiver;
+import com.geoloqi.android.sdk.LQSharedPreferences;
 import com.geoloqi.android.sdk.LQTracker;
 import com.geoloqi.android.sdk.LQTracker.LQTrackerProfile;
 import com.geoloqi.android.sdk.provider.LQDatabaseHelper;
@@ -73,6 +74,8 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         // Start the tracking service
         Intent lqIntent = new Intent(this, LQService.class);
         startService(lqIntent);
+
+        LQSharedPreferences.disablePushNotificationHandling(this);
 
         // Start the Volta service
         Intent vIntent = new Intent(this, VoltaService.class);
@@ -151,7 +154,7 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         if (mVoltaServiceBound) {
             if (!mTestInProgress) {
                 // Start
-                mVoltaService.startTest();
+                mVoltaService.startTest(123456, 2);
             } else {
                 // Stop
                 mVoltaService.stopTest();
