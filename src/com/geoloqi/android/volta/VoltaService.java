@@ -311,16 +311,9 @@ public class VoltaService extends Service {
         JSONObject deviceInfo = new JSONObject();
         JSONObject extra = new JSONObject();
 
-        String userId = LQSharedPreferences.getSessionUserId(this);
-        if (!TextUtils.isEmpty(userId)) {
-            Log.d(TAG, LQSharedPreferences.getSessionUserId(this));
-        } else {
-            Log.d(TAG, "user ID null in getDeviceInfo");
-        }
-
         // Populate Hardware Info
         try {
-            deviceInfo.put("user_id", userId);
+            deviceInfo.put("user_id", LQSharedPreferences.getSessionUserId(this));
             deviceInfo.put("uuid", mDeviceUuid.toString());
             deviceInfo.put("mobile_platform", "android");
             deviceInfo.put("carrier",  mTelephonyManager.getNetworkOperatorName());
