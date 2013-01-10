@@ -4,11 +4,13 @@
 # Ignore generated files and binaries
 bin/
 gen/
+.idea/
 lint.xml
 
 # Ignore editor files
 *.old
 *.swp
+*.iml
 .settings
 .classpath
 local.properties

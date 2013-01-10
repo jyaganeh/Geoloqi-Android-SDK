@@ -13,6 +13,7 @@ import android.preference.PreferenceManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 import com.geoloqi.android.sdk.LQSharedPreferences;
@@ -93,9 +94,35 @@ public class VoltaService extends Service {
         }
     }
 
+    /**
+     * A receiver to listen for user created intents from LQService.
+     */
+    private BroadcastReceiver mUserCreatedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (LQService.ACTION_ANON_USER_CREATED.equals(action)) {
+                mPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+                boolean registered = mPreferences.getBoolean(PREF_IS_DEVICE_REGISTERED, false);
+                if (!registered) {
+                    // post device info to server
+                    boolean success = VoltaHttpClient.postDeviceInfo(getDeviceInfo());
+                    // remember that we've done this so that it doesn't happen again
+                    mPreferences.edit().putBoolean(PREF_IS_DEVICE_REGISTERED, success).commit();
+                }
+            }
+        }
+    };
+
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // Register for user created intents
+        // Register our battery receiver
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(LQService.ACTION_ANON_USER_CREATED);
+        registerReceiver(mUserCreatedReceiver, filter);
 
         // Get the unique id from the device
         mDeviceUuid = new DeviceUuidFactory(this).getDeviceUuid();
@@ -110,15 +137,18 @@ public class VoltaService extends Service {
         mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         mWifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+    }
 
-        mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        boolean registered = mPreferences.getBoolean(PREF_IS_DEVICE_REGISTERED, false);
-        if (!registered) {
-            // post device info to server
-            boolean success = VoltaHttpClient.postDeviceInfo(getDeviceInfo());
-            // remember that we've done this so that it doesn't happen again
-            mPreferences.edit().putBoolean(PREF_IS_DEVICE_REGISTERED, success).commit();
+    @Override
+    public void onDestroy() {
+        try {
+            // Unregister our user-created receiver
+            unregisterReceiver(mUserCreatedReceiver);
+        } catch (IllegalArgumentException e) {
+            // Pass
         }
+
+        super.onDestroy();
     }
 
     /**
@@ -281,8 +311,16 @@ public class VoltaService extends Service {
         JSONObject deviceInfo = new JSONObject();
         JSONObject extra = new JSONObject();
 
+        String userId = LQSharedPreferences.getSessionUserId(this);
+        if (!TextUtils.isEmpty(userId)) {
+            Log.d(TAG, LQSharedPreferences.getSessionUserId(this));
+        } else {
+            Log.d(TAG, "user ID null in getDeviceInfo");
+        }
+
         // Populate Hardware Info
         try {
+            deviceInfo.put("user_id", userId);
             deviceInfo.put("uuid", mDeviceUuid.toString());
             deviceInfo.put("mobile_platform", "android");
             deviceInfo.put("carrier",  mTelephonyManager.getNetworkOperatorName());
