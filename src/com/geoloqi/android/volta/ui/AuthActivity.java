@@ -33,7 +33,7 @@ import com.geoloqi.android.sdk.service.LQService.LQBinder;
  * @author Tristan Waddington
  */
 public class AuthActivity extends Activity implements OnClickListener {
-    public static final String TAG = "AuthActivity";
+    public static final String TAG = "Volta.AuthActivity";
     
     private Handler mHandler = new Handler();
     private LQService mService;

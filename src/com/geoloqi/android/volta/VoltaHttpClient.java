@@ -12,11 +12,11 @@ import org.json.JSONObject;
 public class VoltaHttpClient {
     public static final String TAG = "VoltaHttpClient";
 
-    private static final String BASE_URL = "http://volta.geoloqi.com/api/1/";
-    private static final String TEST_URL = BASE_URL + "tests/";
+    private static final int API_VERSION = 1;
+    private static final String BASE_URL = "http://volta.geoloqi.com/api/" + API_VERSION;
 
-    private static final String DATA_POINTS_URL = BASE_URL + "datapoints/";
-    private static final String DEVICE_INFO_URL = BASE_URL + "devices/";
+    private static final String DATA_POINTS_URL = BASE_URL + "/datapoints";
+    private static final String DEVICE_INFO_URL = BASE_URL + "/devices";
 
 
     public static String makeRequest(String path, JSONObject postData) throws Exception {
@@ -51,7 +51,7 @@ public class VoltaHttpClient {
     }
 
     public static boolean postDataPoints(JSONObject dataPoints) {
-        String url = TEST_URL;
+        String url = DATA_POINTS_URL;
 
         try {
             Log.d(TAG, dataPoints.toString(2));

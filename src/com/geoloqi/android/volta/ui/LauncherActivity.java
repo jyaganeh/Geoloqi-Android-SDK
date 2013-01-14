@@ -9,6 +9,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -34,11 +35,17 @@ import com.geoloqi.android.volta.VoltaService.VoltaBinder;
  * interfaces defined on the {@link SampleReceiver}.</p>
  * 
  * @author Tristan Waddington
+ * @author Josh Yaganeh
+ * @author Court Fowler
  */
 public class LauncherActivity extends Activity implements SampleReceiver.OnLocationChangedListener,
-        SampleReceiver.OnTrackerProfileChangedListener, SampleReceiver.OnLocationUploadedListener,
-        AdapterView.OnItemSelectedListener {
-    public static final String TAG = "LauncherActivity";
+        SampleReceiver.OnLocationUploadedListener, SampleReceiver.OnPushNotificationReceivedListener {
+    public static final String TAG = "Volta.LauncherActivity";
+    public static final String INTENT_START_TEST = "volta.ui.LauncherActivity.StartTest";
+    public static final String INTENT_STOP_TEST = "volta.ui.LauncherActivity.StopTest";
+    public static final String EXTRA_TEST_ID = "volta.ui.LauncherActivity.TestID";
+    public static final String EXTRA_PROFILE = "volta.ui.LauncherActivity.Profile";
+    public static boolean sIsRunning = false;
 
     private LQService mLqService;
     private boolean mLqServiceBound;
@@ -48,38 +55,56 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     private boolean mVoltaServiceBound;
 
     private boolean mTestInProgress = false;
+    private Intent mPendingIntent = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
-        // Set up profile spinner
-        Spinner spinner = (Spinner) findViewById(R.id.profile_spinner);
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
-                R.array.tracker_profile_entries, android.R.layout.simple_spinner_item);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner.setAdapter(adapter);
-        spinner.setOnItemSelectedListener(this);
-
-        // Set up start/stop button
-        Button button = (Button) findViewById(R.id.start_stop_button);
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                toggleTest();
-            }
-        });
+        // If this activity was created in order to start/stop a test, let's hold onto that
+        // intent until we are bound to the VoltaService.
+        String action = getIntent() != null ? getIntent().getAction() : null;
+        if (!TextUtils.isEmpty(action) &&
+                (action.equals(INTENT_START_TEST) || action.equals(INTENT_STOP_TEST))) {
+            mPendingIntent = getIntent();
+        }
         
         // Start the tracking service
         Intent lqIntent = new Intent(this, LQService.class);
         startService(lqIntent);
 
+        // We will handle push notifications ourselves, so disable handling in the SDK
         LQSharedPreferences.disablePushNotificationHandling(this);
 
         // Start the Volta service
         Intent vIntent = new Intent(this, VoltaService.class);
         startService(vIntent);
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent.getAction().equals(INTENT_START_TEST)) {
+            if (intent.hasExtra(EXTRA_TEST_ID) && intent.hasExtra(EXTRA_PROFILE)) {
+                final int profile = intent.getIntExtra(EXTRA_PROFILE, 2);
+                final int testId = intent.getIntExtra(EXTRA_TEST_ID, -1);
+                startTest(testId, profile);
+            } else {
+                Log.w(TAG, "Start test intent received in LauncherActivity without required params!");
+            }
+        } else if (intent.getAction().equals(INTENT_STOP_TEST)) {
+            if (intent.hasExtra(EXTRA_TEST_ID)) {
+                final int testId = intent.getIntExtra(EXTRA_TEST_ID, -1);
+                stopTest(testId);
+            } else {
+                Log.w(TAG, "Stop test intent received in LauncherActivity without required params!");
+            }
+        }
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        sIsRunning = true;
     }
 
     @Override
@@ -120,6 +145,12 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     }
 
     @Override
+    public void onStop() {
+        super.onStop();
+        sIsRunning = false;
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
         MenuInflater inflater = getMenuInflater();
@@ -137,35 +168,32 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
         return false;
     }
 
-    @Override
-    public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
-        LQTrackerProfile profile = LQTrackerProfile.values()[i];
-        Log.d(getString(R.string.app_name),
-                "Profile selected: '" + profile.name() + "'" );
-        mLqService.getTracker().setProfile(profile);
-    }
-
-    @Override
-    public void onNothingSelected(AdapterView<?> adapterView) {
-        // Pass
-    }
-
-    public void toggleTest() {
+    private void startTest(int testId, int profile) {
         if (mVoltaServiceBound) {
             if (!mTestInProgress) {
                 // Start
-                mVoltaService.startTest(123456, 2);
-            } else {
+                mVoltaService.startTest(testId, profile);
+            }
+
+            mTestInProgress = true;
+        }  else {
+            Toast.makeText(this, "VoltaService not bound!", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void stopTest(int testId) {
+        if (mVoltaServiceBound) {
+            if (mTestInProgress && testId == VoltaService.getTestId()) {
                 // Stop
                 mVoltaService.stopTest();
             }
-            mTestInProgress = !mTestInProgress;
-            Button button = (Button) findViewById(R.id.start_stop_button);
-            button.setText(mTestInProgress ? "Stop Test" : "Start Test");
-        } else {
-           Toast.makeText(this, "VoltaService not bound!", Toast.LENGTH_LONG).show();
+
+            mTestInProgress = false;
+        }  else {
+            Toast.makeText(this, "VoltaService not bound!", Toast.LENGTH_LONG).show();
         }
     }
+
     /**
      * Display the number of batched location fixes waiting to be sent.
      */
@@ -222,12 +250,6 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
                 LQBinder binder = (LQBinder) service;
                 mLqService = binder.getService();
                 mLqServiceBound = true;
-
-                // Display the current tracker profile
-                Spinner spinner = (Spinner) findViewById(R.id.profile_spinner);
-                if (spinner != null) {
-                    spinner.setSelection(mLqService.getTracker().getProfile().ordinal());
-                }
             } catch (ClassCastException e) {
                 // Pass
             }
@@ -248,6 +270,10 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
                 VoltaBinder binder = (VoltaBinder) service;
                 mVoltaService = binder.getService();
                 mVoltaServiceBound = true;
+                // We might have an intent waiting to be processed, so let's check and run it if so.
+                if (mPendingIntent != null) {
+                    handleIntent(mPendingIntent);
+                }
             } catch (ClassCastException e) {
                 // Pass
             }
@@ -260,16 +286,6 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     };
 
     @Override
-    public void onTrackerProfileChanged(LQTrackerProfile oldProfile,
-                    LQTrackerProfile newProfile) {
-        // Display the current tracker profile
-        Spinner spinner = (Spinner) findViewById(R.id.profile_spinner);
-        if (spinner != null) {
-            spinner.setSelection(newProfile.ordinal());
-        }
-    }
-
-    @Override
     public void onLocationChanged(Location location) {
         showBatchedLocationCount();
         showCurrentLocation(location);
@@ -278,5 +294,10 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     @Override
     public void onLocationUploaded(int count) {
         showBatchedLocationCount();
+    }
+
+    @Override
+    public void onPushMessageReceived(Intent command) {
+        handleIntent(command);
     }
 }

@@ -24,23 +24,6 @@
             android:layout_height="wrap_content"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:text="Tracker Profile" />
-
-        <Spinner
-            android:id="@+id/profile_spinner"
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginLeft="20dp"
-            android:layout_marginRight="20dp"
-            android:layout_marginTop="5dp"
-            android:layout_marginBottom="10dp" />
-
-        <TextView
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textStyle="bold"
             android:text="Updates" />
         <TextView
             android:id="@+id/batched_updates"
@@ -146,16 +129,5 @@
                 android:layout_height="wrap_content"
                 android:text="0.0" />
         </LinearLayout>
-
-        <!-- Start / Stop button -->
-        <Button
-            android:id="@+id/start_stop_button"
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginLeft="20dp"
-            android:layout_marginRight="20dp"
-            android:layout_marginTop="25dp"
-            android:text="Start Test" />
     </LinearLayout>
 </LinearLayout>

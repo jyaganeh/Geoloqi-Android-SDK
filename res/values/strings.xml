@@ -27,7 +27,7 @@
     <string name="device_mac_title">WiFi MAC address</string>
     <string name="version_title">SDK version</string>
     <string name="build_title">SDK build</string>
-    
+
     <!-- Preference values -->
     <string-array name="tracker_profile_entries">
         <item>OFF</item>

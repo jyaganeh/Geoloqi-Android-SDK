@@ -31,7 +31,7 @@ import com.geoloqi.android.sdk.service.LQService.LQBinder;
  */
 public class SettingsActivity extends PreferenceActivity implements OnPreferenceChangeListener,
         OnPreferenceClickListener {
-    public static final String TAG = "SettingsActivity";
+    public static final String TAG = "Volta.SettingsActivity";
 
     /** An instance of the default SharedPreferences. */
     private SharedPreferences mPreferences;

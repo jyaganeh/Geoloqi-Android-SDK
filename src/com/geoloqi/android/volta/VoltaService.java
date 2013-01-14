@@ -13,7 +13,6 @@ import android.preference.PreferenceManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
-import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 import com.geoloqi.android.sdk.LQSharedPreferences;
@@ -39,6 +38,7 @@ import java.util.UUID;
  * TODO: submit GpsStatus.getMaxSatellites() to the server out of band
  *
  * @author Josh Yaganeh
+ * @author Court Fowler
  */
 public class VoltaService extends Service {
 
@@ -73,10 +73,11 @@ public class VoltaService extends Service {
     private JSONArray mDataQueue;
     private JSONObject mTest;
 
-    private int mTestId;
+    private static int mTestId = -1;
     private UUID mDeviceUuid;
 
     private SharedPreferences mPreferences;
+
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -280,6 +281,10 @@ public class VoltaService extends Service {
     public void recordPeriodicDataPoints() {
         recordBatteryState();
         recordWifiState();
+    }
+
+    public static int getTestId() {
+        return mTestId;
     }
 
     /**

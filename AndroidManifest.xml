@@ -50,7 +50,6 @@
         
         <receiver
             android:name=".receiver.SampleReceiver"
-            android:enabled="true"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.geoloqi.android.sdk.action.TRACKER_PROFILE_CHANGED" />
