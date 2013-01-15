@@ -1,19 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen
     xmlns:android="http://schemas.android.com/apk/res/android" >
-    <!-- Tracking preferences -->
-    <PreferenceCategory
-        android:title="@string/tracking_category_title">
-        <ListPreference
-            android:key="@string/pref_key_tracker_profile"
-            android:title="@string/tracker_profile_title"
-            android:enabled="true"
-            android:entries="@array/tracker_profile_entries"
-            android:entryValues="@array/tracker_profile_values"
-            android:persistent="false"
-            android:defaultValue="2" />
-    </PreferenceCategory>
-    
     <!-- Account preferences -->
     <PreferenceCategory
         android:title="@string/account_category_title">

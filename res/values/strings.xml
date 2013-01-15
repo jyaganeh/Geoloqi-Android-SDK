@@ -21,26 +21,9 @@
     <string name="pref_key_sdk_build">sdk_build</string>
     
     <!-- Preference titles -->
-    <string name="tracker_profile_title">Tracking profile</string>
     <string name="username_title">Username</string>
     <string name="device_id_title">Device ID</string>
     <string name="device_mac_title">WiFi MAC address</string>
     <string name="version_title">SDK version</string>
     <string name="build_title">SDK build</string>
-
-    <!-- Preference values -->
-    <string-array name="tracker_profile_entries">
-        <item>OFF</item>
-        <item>Rough</item>
-        <item>Adaptive</item>
-        <item>Logging</item>
-        <item>Real-time</item>
-    </string-array>
-    <string-array name="tracker_profile_values">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-        <item>3</item>
-        <item>4</item>
-    </string-array>
 </resources>

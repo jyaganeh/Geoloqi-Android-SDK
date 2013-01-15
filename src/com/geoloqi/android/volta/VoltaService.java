@@ -127,17 +127,6 @@ public class VoltaService extends Service {
 
         // Get the unique id from the device
         mDeviceUuid = new DeviceUuidFactory(this).getDeviceUuid();
-
-        // Instantiate receivers, listeners, and managers for the various services we'll monitor.
-        mReceiver = new VoltaBroadcastReceiver();
-
-        mPhoneStateListener = new VoltaPhoneStateListener();
-        mTelephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
-
-        mGpsStateListener = new VoltaGpsStateListener();
-        mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-
-        mWifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
     }
 
     @Override
@@ -157,6 +146,17 @@ public class VoltaService extends Service {
      * begins logging.
      */
     public void startTest(int testId, int profileId) {
+        // Instantiate receivers, listeners, and managers for the various services we'll monitor.
+        mReceiver = new VoltaBroadcastReceiver();
+
+        mPhoneStateListener = new VoltaPhoneStateListener();
+        mTelephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+
+        mGpsStateListener = new VoltaGpsStateListener();
+        mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        mWifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+
         mTestId = testId;
 
         // Reset mTest, mHardwareInfo, and mDataQueue
@@ -172,7 +172,7 @@ public class VoltaService extends Service {
         startService(setProfileIntent);
 
         try {
-            mTest.put("device_uuid", mDeviceUuid.toString());
+            mTest.put("uuid", mDeviceUuid.toString());
             mTest.put("test_id", mTestId);
         } catch (JSONException e) {
             Log.e(TAG, "Could not create test", e);
@@ -196,6 +196,15 @@ public class VoltaService extends Service {
         Log.d(TAG, "The current geoloqi user is: " + LQSharedPreferences.getSessionUsername(this) +
                     " (" + LQSharedPreferences.getSessionUserId(this) + ")");
 
+        try {
+            mTest.put("data", mDataQueue);
+            VoltaHttpClient.postDataPoints(mTest);
+        } catch (Exception e) {
+            Log.e(TAG, "Error adding data points to test object.", e);
+        }
+
+        mDataQueue = new JSONArray();
+
         Toast.makeText(this, "Test started.", Toast.LENGTH_SHORT).show();
     }
 
@@ -209,14 +218,23 @@ public class VoltaService extends Service {
 
         // Unregister for system intents
         unregisterReceiver(mReceiver);
+        mReceiver = null;
 
         // Detach phone state listener
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+        mTelephonyManager = null;
 
         // Detach gps status listener
         mLocationManager.removeGpsStatusListener(mGpsStateListener);
+        mLocationManager = null;
+
+        // Null out the rest
+        mPhoneStateListener = null;
+        mGpsStateListener = null;
+        mWifiManager = null;
 
         try {
+            mTest.put("data", null);
             mTest.put("data", mDataQueue);
             VoltaHttpClient.postDataPoints(mTest);
         } catch (Exception e) {
@@ -262,7 +280,7 @@ public class VoltaService extends Service {
      */
     public void recordDataPoint(String type, float value) {
         // TODO: use dedicated timer. this changes when the system time changes.
-        Long timestamp = System.currentTimeMillis();
+        Long timestamp = System.currentTimeMillis() / 1000;
         JSONObject dataPoint = new JSONObject();
 
         try {
@@ -321,7 +339,7 @@ public class VoltaService extends Service {
             deviceInfo.put("user_id", LQSharedPreferences.getSessionUserId(this));
             deviceInfo.put("uuid", mDeviceUuid.toString());
             deviceInfo.put("mobile_platform", "android");
-            deviceInfo.put("carrier",  mTelephonyManager.getNetworkOperatorName());
+            deviceInfo.put("carrier",  ((TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE)).getNetworkOperatorName());
             deviceInfo.put("hardware_model", Build.MANUFACTURER + " " + Build.MODEL);
 
             extra.put("build", Build.DISPLAY);

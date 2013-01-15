@@ -186,9 +186,11 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
             if (mTestInProgress && testId == VoltaService.getTestId()) {
                 // Stop
                 mVoltaService.stopTest();
-            }
 
-            mTestInProgress = false;
+                mTestInProgress = false;
+            } else {
+                Toast.makeText(this, "Stop received, but no test in progress OR ids did not match", Toast.LENGTH_LONG);
+            }
         }  else {
             Toast.makeText(this, "VoltaService not bound!", Toast.LENGTH_LONG).show();
         }
