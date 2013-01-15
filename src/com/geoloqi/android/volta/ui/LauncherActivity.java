@@ -54,7 +54,6 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     private VoltaService mVoltaService;
     private boolean mVoltaServiceBound;
 
-    private boolean mTestInProgress = false;
     private Intent mPendingIntent = null;
 
     @Override
@@ -83,6 +82,7 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     }
 
     private void handleIntent(Intent intent) {
+        Log.d(TAG, "handling intent");
         if (intent.getAction().equals(INTENT_START_TEST)) {
             if (intent.hasExtra(EXTRA_TEST_ID) && intent.hasExtra(EXTRA_PROFILE)) {
                 final int profile = intent.getIntExtra(EXTRA_PROFILE, 2);
@@ -169,25 +169,23 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
     }
 
     private void startTest(int testId, int profile) {
+        Log.d(TAG, "starting test");
         if (mVoltaServiceBound) {
-            if (!mTestInProgress) {
+            if (!VoltaService.sTestInProgress) {
                 // Start
                 mVoltaService.startTest(testId, profile);
             }
-
-            mTestInProgress = true;
         }  else {
             Toast.makeText(this, "VoltaService not bound!", Toast.LENGTH_LONG).show();
         }
     }
 
     private void stopTest(int testId) {
+        Log.d(TAG, "stopping test");
         if (mVoltaServiceBound) {
-            if (mTestInProgress && testId == VoltaService.getTestId()) {
+            if (VoltaService.sTestInProgress && testId == VoltaService.getTestId()) {
                 // Stop
                 mVoltaService.stopTest();
-
-                mTestInProgress = false;
             } else {
                 Toast.makeText(this, "Stop received, but no test in progress OR ids did not match", Toast.LENGTH_LONG);
             }
@@ -300,6 +298,7 @@ public class LauncherActivity extends Activity implements SampleReceiver.OnLocat
 
     @Override
     public void onPushMessageReceived(Intent command) {
+        Log.d(TAG, "Handling push message received");
         handleIntent(command);
     }
 }

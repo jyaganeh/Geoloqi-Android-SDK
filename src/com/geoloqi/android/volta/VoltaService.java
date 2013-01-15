@@ -43,6 +43,7 @@ import java.util.UUID;
 public class VoltaService extends Service {
 
     public static final String TAG = "VoltaService";
+    public static boolean sTestInProgress = false;
 
     private static final String DATA_POINT_SCREEN_STATE = "screen_state";
     private static final String DATA_POINT_WIFI_STATE = "wifi_state";
@@ -193,6 +194,8 @@ public class VoltaService extends Service {
         // Attach gps status listener
         mLocationManager.addGpsStatusListener(mGpsStateListener);
 
+        sTestInProgress = true;
+
         Log.d(TAG, "The current geoloqi user is: " + LQSharedPreferences.getSessionUsername(this) +
                     " (" + LQSharedPreferences.getSessionUserId(this) + ")");
 
@@ -206,6 +209,7 @@ public class VoltaService extends Service {
         mDataQueue = new JSONArray();
 
         Toast.makeText(this, "Test started.", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "test successfully started");
     }
 
     /**
@@ -233,6 +237,8 @@ public class VoltaService extends Service {
         mGpsStateListener = null;
         mWifiManager = null;
 
+        sTestInProgress = false;
+
         try {
             mTest.put("data", null);
             mTest.put("data", mDataQueue);
@@ -242,6 +248,7 @@ public class VoltaService extends Service {
         }
 
         Toast.makeText(this, "Test stopped.", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "test successfully stopped");
     }
 
     /**
