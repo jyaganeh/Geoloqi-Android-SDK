@@ -115,7 +115,6 @@ public class SampleReceiver extends LQBroadcastReceiver {
                     OnPushNotificationReceivedListener listener = (OnPushNotificationReceivedListener) context;
                     listener.onPushMessageReceived(launcherIntent);
                 } catch (ClassCastException e) {
-                    Log.w(TAG, e);
                     // The broadcast receiver is running with a Context that
                     // does not implement OnPushNotificationReceivedListener. If your activity
                     // has implemented the interface, then this generally means
