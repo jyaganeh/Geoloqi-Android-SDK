@@ -384,8 +384,10 @@ public class VoltaService extends Service {
     private class VoltaGpsStateListener implements GpsStatus.Listener {
         @Override
         public void onGpsStatusChanged(int i) {
-            if (i == GpsStatus.GPS_EVENT_STARTED || i == GpsStatus.GPS_EVENT_STOPPED) {
-                recordDataPoint(DATA_POINT_GPS_STATE, i);
+            if (i == GpsStatus.GPS_EVENT_STARTED) {
+                recordDataPoint(DATA_POINT_GPS_STATE, 1);
+            } else if (i == GpsStatus.GPS_EVENT_STOPPED) {
+                recordDataPoint(DATA_POINT_GPS_STATE, 0);
             }
         }
     }
